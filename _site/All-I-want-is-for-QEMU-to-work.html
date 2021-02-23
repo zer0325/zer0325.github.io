@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <meta name="generator" content="Jekyll">
+
+  <title>All I want is for QEMU to work :)</title>
+
+  <link rel="stylesheet" href="/css/main.css">
+  
+  <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="ATOM Feed" /> <!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>All I want is for QEMU to work :) | zer0325’s blog</title>
+<meta name="generator" content="Jekyll v4.2.0" />
+<meta property="og:title" content="All I want is for QEMU to work :)" />
+<meta name="author" content="zer0325" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Nung una akala ko a simple $ pacman -S qemu is enough. Actually the installation goes smoothly. No problem encountered as seen below." />
+<meta property="og:description" content="Nung una akala ko a simple $ pacman -S qemu is enough. Actually the installation goes smoothly. No problem encountered as seen below." />
+<meta property="og:site_name" content="zer0325’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-11-18T00:00:00+08:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="All I want is for QEMU to work :)" />
+<script type="application/ld+json">
+{"description":"Nung una akala ko a simple $ pacman -S qemu is enough. Actually the installation goes smoothly. No problem encountered as seen below.","url":"/All-I-want-is-for-QEMU-to-work","@type":"BlogPosting","headline":"All I want is for QEMU to work :)","dateModified":"2020-11-18T00:00:00+08:00","datePublished":"2020-11-18T00:00:00+08:00","mainEntityOfPage":{"@type":"WebPage","@id":"/All-I-want-is-for-QEMU-to-work"},"author":{"@type":"Person","name":"zer0325"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+</head>
+
+<body>
+  <div id="wrapper">
+    <header>
+  <div>
+    <a href="/">
+    
+    <h1>[[ zer0325. Not an Engineer. Not a Programmer ]] #</h1>
+    </a>
+    <div class="header-links">
+      <a href="/archive"><h2 class="header-link">Archive</h2></a>
+<a href="/about"><h2 class="header-link">About</h2></a>
+<a href="/atom.xml" onclick="return false"><h2 class="header-link">RSS</h2></a>
+
+    </div>
+  </div>
+</header>
+
+    <div class="container">
+      <section id="main_content">
+        <article>
+  <h2>All I want is for QEMU to work :)</h2>
+  <time datetime="2020-11-18T00:00:00+08:00" class="by-line">18 Nov 2020</time>
+  <p>Nung una akala ko a simple <code class="language-plaintext highlighter-rouge">$ pacman -S qemu</code> is enough. Actually the
+installation goes smoothly. No problem encountered as seen below.</p>
+
+<p><img src="/assets/images/qemu/qemu_install_1.png" alt="qemu installation screenshot" />
+<img src="/assets/images/qemu/qemu_install_2.png" alt="qemu installation screenshot" /></p>
+
+<p>Pero nung ni-run ko na, eto ang lumabas na error. (Screenshot below).</p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-x86_64: error while loading shared libraries: libnettle.so.8:
+cannot open shared object file: No such file or directory</code></p>
+
+<p><img src="/assets/images/qemu/qemu_first_run_error.png" alt="qemu first run error screenshot" /></p>
+
+<p>Actually, umpisa pa lang yan. May mga susunod pang mga errors. And at this
+point, ito lang ang nasa isip ko “All I want is for QEMU to work”, hence the
+title. Btw, I am running Arch.</p>
+
+<blockquote>
+  <p>Output of <code class="language-plaintext highlighter-rouge">$ uname -a</code></p>
+
+  <p><code class="language-plaintext highlighter-rouge">Linux tungkunglangit 4.20.0-arch1-1-ARCH #1 SMP PREEMPT Mon Dec 24 03:00:40 UTC 2018 x86_64 GNU/Linux</code></p>
+</blockquote>
+
+<h4 id="the-journey">The journey</h4>
+
+<p>From this point onward, ilalagay ko na ang details kung paano eventually gumana
+ang <strong>qemu</strong> after nang mga errors na naencounter ko. Note that this is not an
+“All-in-one solution” but rather just an approach on how I eventually managed to
+make <strong>qemu</strong> work. Pwede rin syang mag serve as a reference kung paano
+mareresolve yung mga problems after installation based on the error log.</p>
+
+<p>Una, iaddress natin yun unang error sa taas. First na ginawa ko is look for the
+version of <em>libnettle.so</em> that I have in <code class="language-plaintext highlighter-rouge">/usr/lib/</code> directory. Then check with
+<code class="language-plaintext highlighter-rouge">$ pacman -Qo /usr/lib/libnettle.so.6</code> kung sino ang “owner” of that file. The
+“owner” of the file is an application named <code class="language-plaintext highlighter-rouge">core/nettle</code>. Since the version
+installed in my system is lower, I think it doesn’t hurt to upgrade. So,
+inupgrade ko sya as shown in the screenshot below.</p>
+
+<p><img src="/assets/images/qemu/nettle.png" alt="core/nettle upgrade" /></p>
+
+<p>Then syempre, run qemu again <code class="language-plaintext highlighter-rouge">$ qemu-system-x86_64</code>. Then boom, ERROR.</p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-x86_64: error while loading shared libraries: libnettle.so.6:
+cannot open shared object file: No such file or directory</code></p>
+
+<p><img src="/assets/images/qemu/nettle_error.png" alt="libnettle.so.6 error screenshot" /></p>
+
+<p>Notice the error <code class="language-plaintext highlighter-rouge">libnettle.so.6</code>? Una naghahanap sya nang <code class="language-plaintext highlighter-rouge">libnettle.so.8</code>.
+After mainstall ang <code class="language-plaintext highlighter-rouge">libnettle.so.8</code> ngayon naman hinahanap nya ang lumang
+version? Anong kalokohan to? hahahaha.</p>
+
+<p>Since gusto ko talaga mapagana ang <strong>qemu</strong> and naisip ko andito na eh tuloy na
+natin to. So what I did is to create a symbolic link para sa <code class="language-plaintext highlighter-rouge">libnettle.so.6</code>
+and link it to the upgraded version.</p>
+
+<p><img src="/assets/images/qemu/libnettle_symbolic_link.png" alt="libnettle symbolic link" /></p>
+
+<p>The reasoning behind is that, since
+<code class="language-plaintext highlighter-rouge">libnettle.so.8</code> is an upgraded version of <code class="language-plaintext highlighter-rouge">libnettle.so.6</code>, It should be
+backward-compatible. Meaning the functions present in <code class="language-plaintext highlighter-rouge">libnettle.so.6</code> should
+be in <code class="language-plaintext highlighter-rouge">libnettle.so.8</code>. Kase I doubt na yung author nang library will create an
+upgrade and at the same time knowingly break the applications that uses the old
+version of his library. And besides pwede naman nating ibalik sa dating version
+if ever. Now let’s run again. ERROR!! (na naman).</p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-x86_64: error while loading shared libraries: libhogweed.so.4:
+cannot open shared object file: No such file or directory</code></p>
+
+<p><img src="/assets/images/qemu/libhogweed_error.png" alt="libhogweed error" /></p>
+
+<p>So <code class="language-plaintext highlighter-rouge">$pacman -Qo /usr/lib/libhogweed.so.6</code> na naman para malaman kung sino ang
+“owner” of that file. It turns out, the owner is <code class="language-plaintext highlighter-rouge">core/nettle</code>. So again create
+a symbolic link for <code class="language-plaintext highlighter-rouge">libhogweed.so.4</code> and link it to its upgraded version. So
+run na naman natin. ERROR!!! (see screenshot below)</p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-x86_64: /usr/lib/libnettle.so.8: version 'NETTLE_6' not found
+(required by /usr/lib/libgnutls.so.30)</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-x86_64: /usr/lib/libnettle.so.8: version 'HOGWEED_4' not found
+(required by /usr/lib/libgnutls.so.30)</code></p>
+
+<p><img src="/assets/images/qemu/nettle_hogweed_error.png" alt="nettle and hogweed error" /></p>
+
+<p>Note na yung error now is specific. I think yung <code class="language-plaintext highlighter-rouge">NETTLE_6</code> and <code class="language-plaintext highlighter-rouge">HOGWEED_4</code> are
+the old macros defined in the old version of the library and is now not found
+in the upgraded version. Most probably the macros now will be <code class="language-plaintext highlighter-rouge">NETTLE_8</code> and
+<code class="language-plaintext highlighter-rouge">HOGWEED_6</code> in the upgraded version. But take note sa kung ano file ang
+nangangailangan nang old macros, it is <code class="language-plaintext highlighter-rouge">usr/lib/libgnutls.so.30</code>. So for now
+iwan muna natin sya, but take note of the file <code class="language-plaintext highlighter-rouge">/usr/lib/libgnutls.so.30</code>. And
+also, I want to check kung yung <code class="language-plaintext highlighter-rouge">qemu</code> needs <code class="language-plaintext highlighter-rouge">NETTLE_8</code> or <code class="language-plaintext highlighter-rouge">NETTLE_6</code>. So ang
+ginawa ko is to return to the old version of <code class="language-plaintext highlighter-rouge">core/nettle</code> via <code class="language-plaintext highlighter-rouge">$pacman -U
+nettle-3.4.1-1-x86_64.pkg.tar.xz</code>. Note that the file is in
+<code class="language-plaintext highlighter-rouge">/var/cache/pacman/pkg/</code> directory. Also kailangan muna natin i-remove yung old
+symbolic link because based on experience hindi magtutuloy ang installation.</p>
+
+<p><img src="/assets/images/qemu/old_nettle_install.png" alt="installtion of old nettle" /></p>
+
+<p>After this create tayo nang symbolic link to <code class="language-plaintext highlighter-rouge">libnettle.so.6</code> para sa
+<code class="language-plaintext highlighter-rouge">libnettle.so.8</code> when we run <code class="language-plaintext highlighter-rouge">qemu</code>. And true enough <code class="language-plaintext highlighter-rouge">NETTLE_8</code> nga ang
+kailangan nang <code class="language-plaintext highlighter-rouge">qemu</code> as evidenced by the screenshot below.</p>
+
+<p><img src="/assets/images/qemu/nettle_8.png" alt="nettle version 8" /></p>
+
+<h4 id="back-to-square-one">Back to square one</h4>
+
+<p>So balik sa dati tayo. Since now alam natin ang kailangan nang <code class="language-plaintext highlighter-rouge">qemu</code> is yung
+<code class="language-plaintext highlighter-rouge">NETTLE_8</code> kailangan lang natin iupgrade ulet yung <code class="language-plaintext highlighter-rouge">core/nettle</code> application
+natin. First remove muna natin yung huling symbolic link na ginawa natin. Then
+upgrade yung <code class="language-plaintext highlighter-rouge">core/nettle</code> and then create the symbolic links for
+<code class="language-plaintext highlighter-rouge">libnettle.so.6</code> and <code class="language-plaintext highlighter-rouge">libhogweed.so.4</code> just like nung ginawa natin sa umpisa.
+But this time meron lang tayong iuupgrade na isa pang file. Remember yung
+<code class="language-plaintext highlighter-rouge">/usr/lib/libgnutls.so.30</code> sya yung iuupgrade natin. Now doing a <code class="language-plaintext highlighter-rouge">$pacman -Qo
+/usr/lib/libgnutls.so.30</code>, I found out that the owner of the file is
+<code class="language-plaintext highlighter-rouge">core/gnutls</code>. So I installed <code class="language-plaintext highlighter-rouge">core/gnutls</code> and then run <code class="language-plaintext highlighter-rouge">qemu</code> and wala nang
+error about <code class="language-plaintext highlighter-rouge">libnettle</code>.  Syempre meron na namang ibang error.</p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-i386: symbol lookup error:
+/usr/lib/libvirglrenderer_glEGLIimageTargetTexStorageEXT</code></p>
+
+<p>So I then check yung version nang <code class="language-plaintext highlighter-rouge">virglrenderer</code> application installed in my
+system and unfortunately I have the newest version. See the screenshot below.</p>
+
+<p><img src="/assets/images/qemu/virglrenderer_error.png" alt="viglrenderer error" /></p>
+
+<p>So at this point, I am stumped. So I check na lang yung information about the
+file <code class="language-plaintext highlighter-rouge">virglrenderer</code> via <code class="language-plaintext highlighter-rouge">$pacman -Qi virglrenderer</code>. One of the file that it
+depends on is <code class="language-plaintext highlighter-rouge">libepoxy</code> as shown in the screenshot below.</p>
+
+<p><img src="/assets/images/qemu/virglrenderer_info.png" alt="virglrenderer info" /></p>
+
+<p>So I check kung updated na sya. So I upgraded the file and then run
+<code class="language-plaintext highlighter-rouge">qemu-system-x86_64</code> again and another ERROR.</p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-x86_64: symbol lookup error: qemu-system-x86_64: undefined symbol:
+ZSTD_compressStream2</code></p>
+
+<p><img src="/assets/images/qemu/zstd_error.png" alt="zstd error" /></p>
+
+<p>A google search for the keyword “compressStream2” produces a result about
+“zstd”. So again using pacman check natin if we have an updated <code class="language-plaintext highlighter-rouge">zstd</code>. Since
+hindi sya updated, inupdate ko lang sya and then run again
+<code class="language-plaintext highlighter-rouge">qemu-system-x86_64</code>. Again ERROR na naman.</p>
+
+<p><code class="language-plaintext highlighter-rouge">qemu-system-x86_64: symbol lookup error: qemu-system-x86_64: undefined symbol:
+libusb_wrap_sys_device</code></p>
+
+<p><img src="/assets/images/qemu/libusb_error.png" alt="libusb error.png" /></p>
+
+<p>Since this is just a “libusb” error, I just check again if I have an updated
+version of <code class="language-plaintext highlighter-rouge">libusb</code>. Since hindi sya updated, I try to install the updated
+version of <code class="language-plaintext highlighter-rouge">libusb</code>, pero this time my error na naman. Complaining about
+breaking dependency in libusbx required by libpcap.</p>
+
+<p><img src="/assets/images/qemu/libpcap_error.png" alt="libpcap error" /></p>
+
+<p>So ang ginawa ko lang is update <code class="language-plaintext highlighter-rouge">libpcap</code> and then update <code class="language-plaintext highlighter-rouge">libusb</code>. And then
+run again <code class="language-plaintext highlighter-rouge">qemu-system-x86_64</code> and voila no ERROR.</p>
+
+<p><img src="/assets/images/qemu/qemu_running.png" alt="qemu running" /></p>
+
+<p>Full window screenshot:</p>
+
+<p><img src="/assets/images/qemu/qemu_full.png" alt="qemu full window" /></p>
+
+<h4 id="conclusion">Conclusion</h4>
+
+<p>Although it took me hours to finally make <strong>qemu</strong> work, I think it is worth
+it. Again this is not an “all-in one solution”. And I also doubt that If I can
+reproduce the same sequence on other machines. But the biggest take-away here
+is that, to take note of the error produced because that is the biggest clue in
+solving the problem.</p>
+
+</article>
+      </section>
+    </div>
+  </div>
+
+   <footer>
+  <a href="https://creativecommons.org/licenses/by-nc/3.0/deed.en_US">
+    <span>
+        <b>zer0325</b>
+    </span>
+    
+    <span>© 2021</span>
+  </a>
+</footer>
+
+  
+</body>
+
+</html>

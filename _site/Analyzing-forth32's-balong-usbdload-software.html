@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <meta name="generator" content="Jekyll">
+
+  <title>Analyzing forth32's balong-usbdload software</title>
+
+  <link rel="stylesheet" href="/css/main.css">
+  
+  <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="ATOM Feed" /> <!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Analyzing forth32’s balong-usbdload software | zer0325’s blog</title>
+<meta name="generator" content="Jekyll v4.2.0" />
+<meta property="og:title" content="Analyzing forth32’s balong-usbdload software" />
+<meta name="author" content="zer0325" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="What is balong-usbdload?" />
+<meta property="og:description" content="What is balong-usbdload?" />
+<meta property="og:site_name" content="zer0325’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-09-04T00:00:00+08:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Analyzing forth32’s balong-usbdload software" />
+<script type="application/ld+json">
+{"description":"What is balong-usbdload?","url":"/Analyzing-forth32's-balong-usbdload-software","@type":"BlogPosting","headline":"Analyzing forth32’s balong-usbdload software","dateModified":"2020-09-04T00:00:00+08:00","datePublished":"2020-09-04T00:00:00+08:00","mainEntityOfPage":{"@type":"WebPage","@id":"/Analyzing-forth32's-balong-usbdload-software"},"author":{"@type":"Person","name":"zer0325"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+</head>
+
+<body>
+  <div id="wrapper">
+    <header>
+  <div>
+    <a href="/">
+    
+    <h1>[[ zer0325. Not an Engineer. Not a Programmer ]] #</h1>
+    </a>
+    <div class="header-links">
+      <a href="/archive"><h2 class="header-link">Archive</h2></a>
+<a href="/about"><h2 class="header-link">About</h2></a>
+<a href="/atom.xml" onclick="return false"><h2 class="header-link">RSS</h2></a>
+
+    </div>
+  </div>
+</header>
+
+    <div class="container">
+      <section id="main_content">
+        <article>
+  <h2>Analyzing forth32's balong-usbdload software</h2>
+  <time datetime="2020-09-04T00:00:00+08:00" class="by-line">04 Sep 2020</time>
+  <h4 id="what-is-balong-usbdload">What is <em>balong-usbdload</em>?</h4>
+
+<blockquote>
+  <p>I-quote na lang natin ang <strong>Readme</strong> nya from its <a href="https://github.com/forth32/balong-usbdload"><em>github
+repository</em></a>:</p>
+
+  <p>“Balong-usbdload is an emergency USB boot loader utility for Huawei LTE modems
+and routers with Balong V2R7, V7R11 and V7R22 chipsets.
+It loads external boot loader/firmware update tool file (usbloader.bin) via
+emergency serial port available if the firmware is corrupted or boot pin
+(test point) is shorted to the ground.”</p>
+</blockquote>
+
+<p>From the information above, yung trabaho lang nang <em>balong-usbdload</em> ay mag-load
+nang <em>usbloader.bin</em> file. Ang flashing kase nang Huawei LTE modems and routers,
+ay two-step process. Una, flash the <em>usbloader.bin</em>, which is trabaho nang
+<em>balong-usbdload</em>, then second yung actual flashing na nang firmware.</p>
+
+<p><em>Note: Eto yung ginagamit natin sa pagflash for example nang B315s-936 na
+router.</em></p>
+
+<p>Since open-source naman sya, let us analyze kung paano nya ba niloload yung
+<em>usbloader.bin</em>. The question is, bakit naman natin iaanalyze? Ano ang mapapala
+natin?</p>
+
+<p>Una, sa mga gustong matuto nang programming, specifically C programming, makakatulong
+naman sya kasi makikita natin kung pano yung approach nang programmer
+(<strong>forth32</strong>) sa pagcreate nya nang program. Ikalawa, doon sa may idea na kung paano
+mag create nang program using C, magkakaroon tayo nang additional idea kung pano ang
+program flow nang naturang program. And at the same time, pwede tayong magcreate
+nang sarili nating implementation based on that analysis. Yung full source-code
+nang implementation can be seen in <a href="https://github.com/zer0325/balong-malalim">my github
+repo</a>.</p>
+
+<p>Note: The source code is in <strong>Russian</strong>, specifically yung mga comments lang naman
+but yung actual code is in english. Heavily commented sya in <strong>Russian</strong> kaya
+malaking tulong sa pagaanalyze natin nang program flow. Meron akong compilation
+in English nang mga comments, which can also be found in the above repo.</p>
+
+<h2 id="lets-start">Let’s start:</h2>
+
+<p>Mas maige if we have the source code open habang inaalyze natin sya. You can
+use any text editor. In my case I use <em>vim</em>. Below is the screen shot of the
+partial source of <em>balong-usbdload.c</em>.</p>
+
+<p><img src="/assets/images/balong/partial_source.png" alt="Screenshot of the partial source code of balong-usbdload.c" /></p>
+
+<p>Fist, note that the execution of any C program starts from the function
+<strong>main</strong>. Note also that a C program can have multiple functions, but yung
+pinaka-special  yung <strong>main</strong> function. So ang una nating gagawin is to open
+the source and look for the <strong>main</strong> function. Below is the screenshot of the
+<strong>main</strong> function.</p>
+
+<p><img src="/assets/images/balong/partial_source_main.png" alt="Screenshot of the partial source of the  main function" /></p>
+
+<p>Since alam na natin na ang trabaho nang <em>balong-usbdload</em> is to load the
+<em>usbloader.bin</em> file, let’s look for the code na may kinalaman sa procedure nang
+pagloload nang <em>usbloader.bin</em> file. Below is the screenshot for the procedure
+of loading the <em>usbloader.bin</em> file.</p>
+
+<p><img src="/assets/images/balong/loading_procedure.png" alt="Screenshot of the loading procedure" /></p>
+
+<p>Let us check yung lines <code class="language-plaintext highlighter-rouge">574, 595, and 606</code>, kung mapapansin nyo separate
+<code class="language-plaintext highlighter-rouge">sendcmd</code> sya with different arguments, <code class="language-plaintext highlighter-rouge">cmdhead, cmddata, cmdeod</code>. So ibig
+sabihin merong format yung data na sinisend. We can safely deduce na yung format
+nang data packet is:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code> -------------------------------------------
+|  cmdhead  |      cmddata      |   cmdeod  |
+ -------------------------------------------
+</code></pre></div></div>
+
+<p>Yung <code class="language-plaintext highlighter-rouge">cmddata</code> is sent every <code class="language-plaintext highlighter-rouge">1024+5</code> bytes, yung <code class="language-plaintext highlighter-rouge">cmdhead</code> is <code class="language-plaintext highlighter-rouge">14</code> bytes at
+yung <code class="language-plaintext highlighter-rouge">cmdhead</code> ay <code class="language-plaintext highlighter-rouge">5</code> bytes. And also, the  sending is done twice as seen in
+<code class="language-plaintext highlighter-rouge">line 562</code>. So yung buong <em>usbloader.bin</em> file is divided into two blocks of
+data, which means there is some kind of a preparation procedure. True enough,
+if we scroll-up the source code makikita natin na there is some kind of
+preparation procedure. Below is the image of the partial source of the
+preparation procedure.</p>
+
+<p><img src="/assets/images/balong/preparation_procedure.png" alt="Screenshot of the preparation procedure" /></p>
+
+<p>So para mas madali natin maanalyze, let’s divide the analysis into two:
+<em>preparing the loader</em> and <em>sending the loader</em>.</p>
+
+<h3 id="preparing-the-loader">Preparing the loader</h3>
+
+<p>The procedure for preparing the loader starts at line 389. Lines 389-394 only
+checks for the presence of the <em>usbloader.bin</em> file. Kung hindi sya present, mag
+eexit lang ang program. Lines 396-400 checks if the file is a valid
+<em>usbloader.bin</em> file by checking if the the first 4 bytes is equal to 0x20000.
+Again if the file is not a valid “loader” file, the program will exit. Line 402
+advances the file pointer to 36 bytes starting from the beginning of the file.
+Let us focus our attention to the lines 406 - 407. Ang ginagawa nang dalawang
+lines na yan is to get the next 32 bytes after the 36-bytes offset from the
+beginning of the file. Each 16-byte actually contains information about each
+block of data. The first 16-byte contains information about the <em>raminit</em> block
+and the next 16-byte contains information about the <em>usbloader</em> block. Each
+16-byte is saved in an array. Each block is a data structure as shown below.</p>
+
+<p><img src="/assets/images/balong/block_struct.png" alt="block structure" /></p>
+
+<p>Looking at the image above, both the <em>raminit</em> and <em>usbloader</em> block has the
+following structure:</p>
+
+<ul>
+  <li>First 4-byte is the boot mode</li>
+  <li>Second 4-byte is the size</li>
+  <li>Third 4-byte is the address</li>
+  <li>Fourth 4-byte is the offset</li>
+</ul>
+
+<p>Note na meron pang limang member yung data structure whose type is a <em>char
+pointer</em>. This member will contain the address in memory of the actual block of
+data. Lines 411 - 422 confirms that as shown in the image below.</p>
+
+<p><img src="/assets/images/balong/malloc.png" alt="memory allocation" /></p>
+
+<p>Using the image above as the reference, let us try to analyze each line
+one-by-one. In line 414, it allocates a memory whose size is the defined by the
+member <strong>.size</strong> for that block. After allocating the size, the lines 417-418,
+it copies the block (<em>raminit</em> or <em>usbloader</em>), starting from the offset defined
+by the <strong>.offset</strong> member to the memory address defined in <strong>.pbuf</strong> member. So,
+eto na yung part na kinacopy na yung actual data sa memory. So once it is done,
+ready na sya for loading. Note that this data is the original data, hindi pa sya
+pinapatch kase the succeeding lines after line 427 is where the data patching is
+done. For now, wag na muna natin intindihin ang patching, let us first create a
+function that will prepare the loader file.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>int prepare_loader(char *loader)
+{
+	int i;
+
+	/* advance the file pointer 36-bytes from the beginning of the file */
+	fseek(loader, 36, SEEK_SET);
+	fread(&amp;blk[0], 1, 16, loader);	/* read the first 16-bytes */
+	fread(&amp;blk[1], 1, 16, loader); 	/* read the next 16-bytes */
+
+	for(i = 0; i &lt; 2; i++){
+		blk[0].pbuf = (char *)malloc(blk[i].size); 	/* allocates memory */
+
+		/* advance the file pointer blk[i].offset bytes from the beginning of
+		 * the file */
+		fseek(loader, blk[i].offset, SEEK_SET);
+
+		/* copy the data to the memory location defined in blk[i].pbuf member */
+		fread(blk[i].pbuf, 1, blk[i].size, loader);
+	}
+
+	return 1;
+}
+</code></pre></div></div>
+<p>Note na hindi na tayo nag check if it is a valid loader file. Trabaho na kasi
+nang caller nang <em>prepare_loader()</em> function na to make sure na yung ipapasa
+nyang file is a valid loader file.</p>
+
+<p>Now that we have the function that will prepare the loader, analyze naman natin
+yung procedure kung paano nya iloload yung loader sa device.</p>
+
+<h3 id="sending-the-loader">Sending the loader</h3>
+
+<p><img src="/assets/images/balong/loading_procedure.png" alt="Screenshot of the loading procedure" /></p>
+
+<p>As discussed previously the data packet has the following format:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code> -------------------------------------------
+|  cmdhead  |      cmddata      |   cmdeod  |
+ -------------------------------------------
+</code></pre></div></div>
+
+<p>So para mas madali nating mavisualize and maimplement nadin, lets name yung
+<code class="language-plaintext highlighter-rouge">cmdhead</code> as the <code class="language-plaintext highlighter-rouge">HEADER_FRAME</code>, yung <code class="language-plaintext highlighter-rouge">cmddata</code> as <code class="language-plaintext highlighter-rouge">DATA_FRAME</code>, at yung
+<code class="language-plaintext highlighter-rouge">cmdeod</code> as <code class="language-plaintext highlighter-rouge">END_FRAME</code>. Each <code class="language-plaintext highlighter-rouge">FRAME</code> has a format as shown in the image below.</p>
+
+<p><img src="/assets/images/balong/packet_info.png" alt="data packet format" /></p>
+
+<p>The <code class="language-plaintext highlighter-rouge">START_FRAME</code> has a format specified by the line 283 and lines 569 - 570. The
+<code class="language-plaintext highlighter-rouge">START_FRAME</code> format is: <code class="language-plaintext highlighter-rouge">0xfe, 0x00, 0xff, lmode, size, addr, 0x00, 0x00</code>. Both
+the size and the addr is 4 bytes and lmode is 1 byte. In lines 569 - 570 both
+the size and addr are converted to host byte order using the <em>htonl(3)</em>
+function.</p>
+
+<p>The <code class="language-plaintext highlighter-rouge">DATA_FRAME</code> has a format specified by the line 284 and the lines 590-591.
+The <code class="language-plaintext highlighter-rouge">DATA_FRAME</code> format is: <code class="language-plaintext highlighter-rouge">0xDA, packet_count, ~packet_count, DATA, 0x00, 0x00</code>. The
+<code class="language-plaintext highlighter-rouge">~packet_count</code> is just the complement of <code class="language-plaintext highlighter-rouge">packet_count</code>. The <code class="language-plaintext highlighter-rouge">DATA_FRAME</code> is a
+1024+5 byte data whose start address is defined in the <strong>.pbuf</strong> member of the
+data structure. Note that the <code class="language-plaintext highlighter-rouge">DATA_FRAME</code> is sent every 1024+5<code class="language-plaintext highlighter-rouge">th</code> bytes.</p>
+
+<p>The <code class="language-plaintext highlighter-rouge">END_FRAME</code> has a format specified by the line 285 and the lines 603 - 604.
+The <code class="language-plaintext highlighter-rouge">END_FRAME</code> format is: <code class="language-plaintext highlighter-rouge">0xED, packet_count, ~packet_count, 0x00, 0x00</code>.</p>
+
+<p>Now let’s create a function that will implement the sending procedure.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">send_loader</span><span class="p">(</span><span class="kt">int</span> <span class="n">devfd</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">int</span> <span class="n">packet_count</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">offset</span><span class="p">;</span>
+	<span class="kt">unsigned</span> <span class="kt">char</span> <span class="n">start_frame</span><span class="p">[</span><span class="mi">14</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mh">0xfe</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mh">0xff</span><span class="p">};</span>
+	<span class="kt">unsigned</span> <span class="kt">char</span> <span class="n">data_frame</span><span class="p">[</span><span class="mi">1040</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mh">0xda</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">};</span>
+	<span class="kt">unsigned</span> <span class="kt">char</span> <span class="n">end_frame</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mh">0xed</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">};</span>
+
+	<span class="k">for</span><span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+		<span class="n">packet_count</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+		<span class="n">start_frame</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">lmode</span><span class="p">;</span>
+
+		<span class="cm">/* convert both size and addr to host byte order */</span>
+
+		<span class="o">*</span><span class="p">((</span><span class="kt">unsigned</span> <span class="kt">int</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">start_frame</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span> <span class="o">=</span> <span class="n">htonl</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="o">*</span><span class="p">((</span><span class="n">unsgined</span> <span class="kt">int</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">start_frame</span><span class="p">[</span><span class="mi">8</span><span class="p">])</span> <span class="o">=</span> <span class="n">htonl</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">addr</span><span class="p">);</span>
+
+		<span class="cm">/* send the start_frame packet */</span>
+		<span class="n">send_packet</span><span class="p">(</span><span class="n">start_frame</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="n">devfd</span><span class="p">);</span>
+
+		<span class="cm">/* format the data_frame packet */</span>
+		<span class="k">for</span><span class="p">(</span><span class="n">offset</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">offset</span><span class="o">+</span><span class="n">datasize</span> <span class="o">&lt;</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">;</span> <span class="n">offset</span> <span class="o">+=</span> <span class="mi">1024</span><span class="p">){</span>
+			<span class="n">data_frame</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">packet_count</span><span class="p">;</span>
+			<span class="n">data_frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="o">~</span><span class="n">packet_count</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="p">;</span>
+			<span class="n">memcpy</span><span class="p">((</span><span class="kt">void</span> <span class="o">*</span><span class="p">)(</span><span class="n">data_frame</span> <span class="o">+</span> <span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pbuf</span> <span class="o">+</span> <span class="n">offset</span><span class="p">),</span> <span class="n">datasize</span><span class="p">);</span>
+
+			<span class="cm">/* send the data_frame packet */</span>
+			<span class="n">send_packet</span><span class="p">(</span><span class="n">data_frame</span><span class="p">,</span> <span class="n">datasize</span> <span class="o">+</span> <span class="mi">5</span><span class="p">,</span> <span class="n">devfd</span><span class="p">);</span>
+			<span class="n">packet_count</span><span class="o">++</span><span class="p">;</span>
+		<span class="p">}</span>
+
+		<span class="cm">/* Do the remaining data_frame packet */</span>
+		<span class="n">data_frame</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">packet_count</span><span class="p">;</span>
+		<span class="n">data_frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="o">~</span><span class="n">packet_count</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="p">;</span>
+		<span class="n">memcpy</span><span class="p">((</span><span class="kt">void</span> <span class="o">*</span><span class="p">)(</span><span class="n">data_frame</span> <span class="o">+</span> <span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pbuf</span> <span class="o">+</span> <span class="n">offset</span><span class="p">),</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span> <span class="o">-</span> <span class="n">offset</span><span class="p">);</span>
+
+		<span class="cm">/* send the data_frame packet */</span>
+		<span class="n">send_packet</span><span class="p">(</span><span class="n">data_frame</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span> <span class="o">-</span> <span class="n">offset</span> <span class="o">+</span> <span class="mi">5</span><span class="p">,</span> <span class="n">devfd</span><span class="p">);</span>
+		<span class="n">packet_count</span><span class="o">++</span><span class="p">;</span>
+
+		<span class="cm">/* Format the end_frame packet */</span>
+		<span class="n">end_frame</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">packet_count</span><span class="p">;</span>
+		<span class="n">end_frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="o">~</span><span class="n">packet_count</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="p">;</span>
+
+		<span class="cm">/* send the end_frame packet */</span>
+		<span class="n">send_packet</span><span class="p">(</span><span class="n">end_frame</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="n">devfd</span><span class="p">);</span>
+	<span class="p">}</span>
+
+	<span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Kung mapapansin nyo, merong <em>send_packet()</em> function that we have included in
+the code above. The <em>send_packet()</em> function that we use here, also follow the
+same principle na ginawa sa original <strong>balong-usbdload</strong> code. Meron lang tayong
+idinagdag na additional argument, yun yung <em>devfd</em>. So let us analyze the code
+from the original <strong>balong-usbdload.c</strong> for the <em>send_packet()</em> function. Note
+that sa original <strong>balong-usbdload.c</strong> code, ang name nang function is
+<em>sendcmd</em>.</p>
+
+<p><img src="/assets/images/balong/sendcmd.png" alt="Screenshot of the source of sendcmd function" /></p>
+
+<p>Using the image above, yung lines 86 - 115 is the procedure nya for sending the
+packet. Kung makikita natin, ilang lines of code lang sya. Pero ang gist dito is
+compute the checksum of the data, send the data via the write(3) function, and
+check the reply. The function returns 0 kung ang length nang reply nya is zero
+or kung yung first byte nang reply buffer is not <code class="language-plaintext highlighter-rouge">0xAA</code>. It returns 1 if
+successful yung sending of packet. Let’s now implement the <em>send_packet()</em>
+function.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">send_packet</span><span class="p">(</span><span class="kt">unsigned</span> <span class="kt">char</span> <span class="o">*</span><span class="n">buf</span><span class="p">,</span> <span class="kt">int</span> <span class="n">len</span><span class="p">,</span> <span class="kt">int</span> <span class="n">devfd</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">unsigned</span> <span class="kt">char</span> <span class="n">replybuf</span><span class="p">[</span><span class="mi">1024</span><span class="p">];</span>	<span class="cm">/* reply buffer */</span>
+	<span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">replylen</span><span class="p">;</span>
+
+	<span class="n">checksum</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">len</span><span class="p">);</span>				<span class="cm">/* compute the checksum */</span>
+	<span class="n">write</span><span class="p">(</span><span class="n">devfd</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">len</span><span class="p">);</span>			<span class="cm">/* write to the device */</span>
+	<span class="n">tcdrain</span><span class="p">(</span><span class="n">devfd</span><span class="p">);</span>
+	<span class="n">replylen</span> <span class="o">=</span> <span class="n">read</span><span class="p">(</span><span class="n">devfd</span><span class="p">,</span> <span class="n">replybuf</span><span class="p">,</span> <span class="mi">1024</span><span class="p">);</span>
+	<span class="k">if</span><span class="p">(</span><span class="n">replylen</span> <span class="o">=</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">replybuf</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="mh">0xAA</span><span class="p">)</span>
+		<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+
+	<span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Note that there is another function na included sa above code. Yun yung
+<em>checksum()</em> function. Tingnan natin ulet yung source at ianalyze natin kung
+paano nya kinocompute yung checksum. Gamitin natin as a reference yung screenshot
+below.</p>
+
+<p><img src="/assets/images/balong/csum.png" alt="Screenshot of the source of the checksum function" /></p>
+
+<p>Yung <em>checksum()</em> function is from line 67 - line 84. Sa lines 76 - 80, makikita
+natin na nireread nya yung every byte or char from the data up to but not
+including the second to the last of the data. So isa-isahin natin. Yung
+expression <code class="language-plaintext highlighter-rouge">csum &lt;&lt; 4</code> means shift-left csum four times, which is equivalent to
+saying that the <code class="language-plaintext highlighter-rouge">csum</code> is multiplied by 16. Yung <code class="language-plaintext highlighter-rouge">caret (^)</code> means an <code class="language-plaintext highlighter-rouge">XOR</code>
+operation. So yung gist nya, is <code class="language-plaintext highlighter-rouge">multiply the current checksum to 16 then X0R
+the product to a **CONSTANT**; Do the operation twice</code>. Now yung <strong>CONSTANT</strong> is
+one of the element of the array cconst. The element is computed by performing an
+<code class="language-plaintext highlighter-rouge">XOR</code> between the most significant 4-bits <em>(nibble)</em> ng current character na
+na-read and yung most significant 4-bits nang current checksum. On the second
+operation the element of the array is computed by <code class="language-plaintext highlighter-rouge">XOR</code>ing the least significant
+4-bits nang current character and the most significant 4-bits ng current
+checksum. After nya macompute ang checksum, sinave nya yung most significant
+byte sa <code class="language-plaintext highlighter-rouge">buf[len-2]</code> and yung least significant byte sa <code class="language-plaintext highlighter-rouge">buf[len-1]</code>. Now, based sa
+information na nakuha natin, we can implement the checksum.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">checksum</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">buffer</span><span class="p">,</span> <span class="kt">int</span> <span class="n">len</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">csum</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+	<span class="cm">/* array of constants */</span>
+	<span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">cconst</span><span class="p">[]</span> <span class="o">=</span> <span class="p">{</span>
+		<span class="mh">0x0000</span><span class="p">,</span> <span class="mh">0x1021</span><span class="p">,</span> <span class="mh">0x2042</span><span class="p">,</span> <span class="mh">0x3063</span><span class="p">,</span>
+		<span class="mh">0x4084</span><span class="p">,</span> <span class="mh">0x50A5</span><span class="p">,</span> <span class="mh">0x60C6</span><span class="p">,</span> <span class="mh">0x70E7</span><span class="p">,</span>
+		<span class="mh">0x8108</span><span class="p">,</span> <span class="mh">0x9129</span><span class="p">,</span> <span class="mh">0xA14A</span><span class="p">,</span> <span class="mh">0xB16B</span><span class="p">,</span>
+		<span class="mh">0xC18C</span><span class="p">,</span> <span class="mh">0xD1AD</span><span class="p">,</span> <span class="mh">0xE1CE</span><span class="p">,</span> <span class="mh">0xF1EF</span>
+	<span class="p">};</span>
+
+	<span class="k">for</span><span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">len</span> <span class="o">-</span> <span class="mi">2</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+		<span class="n">c</span> <span class="o">=</span> <span class="n">buf</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&amp;</span> <span class="mh">0xFF</span><span class="p">;</span>
+		<span class="n">csum</span> <span class="o">=</span> <span class="p">((</span><span class="n">csum</span> <span class="o">&lt;&lt;</span> <span class="mi">4</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xFFFF</span><span class="p">)</span> <span class="o">^</span> <span class="n">cconst</span><span class="p">[(</span><span class="n">c</span> <span class="o">&gt;&gt;</span> <span class="mi">4</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">csum</span> <span class="o">&gt;&gt;</span> <span class="mi">12</span><span class="p">)];</span>
+		<span class="n">csum</span> <span class="o">=</span> <span class="p">((</span><span class="n">csum</span> <span class="o">&lt;&lt;</span> <span class="mi">4</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xFFFF</span><span class="p">)</span> <span class="o">^</span> <span class="n">cconst</span><span class="p">[(</span><span class="n">c</span> <span class="o">&amp;</span> <span class="mh">0xF</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">csum</span> <span class="o">&gt;&gt;</span> <span class="mi">12</span><span class="p">)];</span>
+	<span class="p">}</span>
+	<span class="n">buffer</span><span class="p">[</span><span class="n">len</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">csum</span> <span class="o">&gt;&gt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xFF</span><span class="p">);</span>
+	<span class="n">buffer</span><span class="p">[</span><span class="n">len</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">csum</span> <span class="o">&amp;</span> <span class="mh">0xFF</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Kung mapapansin nyo merong mga <code class="language-plaintext highlighter-rouge">AND</code> (<code class="language-plaintext highlighter-rouge">&amp;</code>) operation, that is for bit-masking. Ang
+ibig lang sabihin nyan is gusto nya lang makuha yung number of bits na kailangan
+mo sa isang value. For example, sa <code class="language-plaintext highlighter-rouge">((csum &lt;&lt; 4) &amp; 0xFFFF)</code>, we only need yung
+least-significant 16-bits or 4-nibbles or 2-bytes. Don naman sa <code class="language-plaintext highlighter-rouge">c &amp; 0xF</code>, we
+only need yung least-significant 4-bits or 1-nibble. And don naman sa <code class="language-plaintext highlighter-rouge">csum &amp;
+0xFF</code>, we only need yung least-significant 8-bits or 1-byte.</p>
+
+<p>Now na meron na tayong implementation nang both procedures, kailangan pa natin
+nang isa pang procedure. Yun yung procedure nang pag-prepare nang port na
+gagamitin para masend yung <em>usbloader.bin</em> sa device. Earlier sabi natin na
+meron tayong additional argument para sa implementation nang <em>send_packet()</em>
+function, yung yung <strong>devfd</strong>. Yung <strong>devfd</strong> is yung file descriptor nang port
+na gagamitin nang program natin to communicate sa device. So, let us now analyze
+yung source kung paano nya prinepare yung port.</p>
+
+<h3 id="preparing-the-port">Preparing the port</h3>
+
+<p><img src="/assets/images/balong/openport.png" alt="Partial source for the procedure in opening the port" /></p>
+
+<p>Using the image above as reference, the lines 117 - 193 is the procedure in
+preparing or opening the port. Yung pinakaimportante lang naman dito is yung
+line 140, which opens the device and assigns a file descriptor to the opened
+device and the lines 143 - 150 which configures the device. Yung lines before
+140 is just manipulation nang device name na eventually maglelead sa device name
+na <code class="language-plaintext highlighter-rouge">/dev/ttyUSB0</code> for default or <code class="language-plaintext highlighter-rouge">/dev/ttyUSBx</code>, where <code class="language-plaintext highlighter-rouge">x</code> is a positive number.
+So isa-isahin natin ang mga relevant lines para may idea tayo. Yung line 140
+opens the device e.g. <code class="language-plaintext highlighter-rouge">/dev/ttyUSB0</code> and returns the file descriptor for that
+device. Yung mga flags na <code class="language-plaintext highlighter-rouge">O_RDWR | O_NOCTTY | O_SYNC</code> means open the device in
+read-write mode, do not make the device a controlling terminal, and synchronous
+communication, respectively. Yung line 143 just zero-out the option or the
+configuration. The lines 144 -149 just sets the configuration for the device.
+Now, lets implement yung pag-prepare nang port and call the function
+<em>open_port()</em>.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">open_port</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">devname</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="cm">/* lets open the port */</span>
+	<span class="n">devfd</span> <span class="o">=</span> <span class="n">open</span><span class="p">(</span><span class="n">devname</span><span class="p">,</span> <span class="n">O_RDWR</span> <span class="o">|</span> <span class="n">O_NOCTTY</span> <span class="o">|</span> <span class="n">O_SYNC</span><span class="p">);</span>
+
+	<span class="cm">/* get the current configuration */</span>
+	<span class="n">tcgetattr</span><span class="p">(</span><span class="n">devfd</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">options</span><span class="p">);</span>
+
+	<span class="cm">/* zero-out the current configuration */</span>
+	<span class="n">bzero</span><span class="p">(</span><span class="o">&amp;</span><span class="n">options</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">options</span><span class="p">));</span>
+
+	<span class="cm">/* set the options */</span>
+	<span class="n">options</span><span class="p">.</span><span class="n">c_cflag</span> <span class="o">|=</span> <span class="n">B115200</span> <span class="o">|</span> <span class="n">CS8</span> <span class="o">|</span> <span class="n">C_LOCAL</span> <span class="o">|</span> <span class="n">C_READ</span><span class="p">;</span>
+	<span class="n">options</span><span class="p">.</span><span class="n">c_lflag</span> <span class="o">&amp;=</span> <span class="mi">0</span><span class="p">;</span>
+	<span class="n">options</span><span class="p">.</span><span class="n">c_iflag</span> <span class="o">&amp;=</span> <span class="mi">0</span><span class="p">;</span>
+	<span class="n">options</span><span class="p">.</span><span class="n">c_oflag</span> <span class="o">&amp;=</span> <span class="mi">0</span><span class="p">;</span>
+	<span class="n">options</span><span class="p">.</span><span class="n">c_cc</span><span class="p">[</span><span class="n">VTIME</span><span class="p">]</span> <span class="o">=</span> <span class="mi">30</span><span class="p">;</span>
+	<span class="n">options</span><span class="p">.</span><span class="n">c_cc</span><span class="p">[</span><span class="n">VMIN</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+	<span class="cm">/* save the options */</span>
+	<span class="n">tcsetattr</span><span class="p">(</span><span class="n">devfd</span><span class="p">,</span> <span class="n">TCSANOW</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">options</span><span class="p">);</span>
+
+	<span class="k">return</span> <span class="n">devfd</span><span class="p">;</span>
+
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Remember when I say earlier doon sa <em>preparing the loader</em> procedure, na there
+is another procedure wherein the <em>usbloader.bin</em> is being patched before it is
+being sent to the device. Now we are going to analyze kung papano nya pinapatch
+ang <em>usbloader.bin</em> file.</p>
+
+<h3 id="patching-the-loader">Patching the loader</h3>
+
+<p>If you look inside the <a href="https://github.com/forth32/balong-usbdload">source’s
+repository</a>, there is a file named
+<em>patcher.c</em>. This is the source file where the implementation for patching the
+<em>usbloader.bin</em> file is located. So, let’s open that file and try to analyze the
+procedure for patching the <em>usbloader.bin</em> file. Below is the screenshot of the
+partial source for the patching procedure.</p>
+
+<p><img src="/assets/images/balong/patcher.png" alt="Partial source for the patching procedure" /></p>
+
+<p>Let’s concentrate on line 20. Kung mapapansin natin ang ginagawa nya lang is
+look for the signature and then if found, perform a patch. Yung patching nya is
+dalawang klase, <code class="language-plaintext highlighter-rouge">nop-patch</code> and <code class="language-plaintext highlighter-rouge">br-patch</code>. Depende sa value ng <em>ptype</em> argument
+kung anong patch ang ipeperform nya. Pag <code class="language-plaintext highlighter-rouge">nop-patch</code> i-papatch nya lang yung
+4-bytes starting from the value defined by the <code class="language-plaintext highlighter-rouge">fp.offset</code>. Pag <code class="language-plaintext highlighter-rouge">br-patch</code> naman
+single-byte patch lang ang gagawin at that same location. Yung <em>patch()</em>
+function will return the offset of the signature found or 0 if  the signature is
+not found. So let’s now implement the patching procedure.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">uint32_t</span> <span class="nf">patch</span><span class="p">(</span><span class="k">struct</span> <span class="n">defpatch</span> <span class="n">fp</span><span class="p">,</span> <span class="kt">uint8_t</span> <span class="o">*</span><span class="n">buf</span><span class="p">,</span> <span class="kt">uint32_t</span> <span class="n">size</span><span class="p">,</span> <span class="kt">uint32_t</span> <span class="n">ptype</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="cm">/* Initialize nop data */</span>
+	<span class="k">const</span> <span class="kt">char</span> <span class="n">nop</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mh">0xA0</span><span class="p">,</span> <span class="mh">0xE3</span><span class="p">};</span>
+	<span class="kt">uint32_t</span> <span class="n">i</span><span class="p">;</span>
+	<span class="kt">int8_t</span> <span class="n">c</span><span class="p">;</span>
+
+	<span class="cm">/* start looking after the 8th element */</span>
+	<span class="k">for</span><span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">8</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">size</span> <span class="o">-</span> <span class="mi">60</span><span class="p">;</span> <span class="n">i</span> <span class="o">+=</span> <span class="mi">4</span><span class="p">){</span>
+		<span class="cm">/* Test if the signature is present */</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">memcmp</span><span class="p">(</span><span class="n">buf</span> <span class="o">+</span> <span class="n">i</span><span class="p">,</span> <span class="n">fp</span><span class="p">.</span><span class="n">sig</span><span class="p">,</span> <span class="n">fp</span><span class="p">.</span><span class="n">sigsize</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">){</span>
+			<span class="cm">/* If the signature is present, perform patching based on the value
+			 * of ptype */</span>
+			<span class="k">switch</span><span class="p">(</span><span class="n">ptype</span><span class="p">){</span>
+				<span class="k">case</span> <span class="mi">0</span><span class="p">:</span> <span class="cm">/* perform a nop-patch */</span>
+					<span class="n">memcpy</span><span class="p">((</span><span class="n">buf</span> <span class="o">+</span> <span class="n">i</span> <span class="o">+</span> <span class="n">fp</span><span class="p">.</span><span class="n">sigsize</span> <span class="o">+</span> <span class="n">fp</span><span class="p">.</span><span class="n">poffset</span><span class="p">),</span> <span class="n">nop</span><span class="p">,</span> <span class="mi">4</span><span class="p">);</span>
+					<span class="k">return</span> <span class="n">i</span><span class="p">;</span>
+				<span class="k">case</span> <span class="mi">1</span><span class="p">:</span>	<span class="cm">/* perform br-patch */</span>
+					<span class="n">c</span> <span class="o">=</span> <span class="o">*</span><span class="p">(</span><span class="n">buf</span> <span class="o">+</span> <span class="n">i</span> <span class="o">+</span> <span class="n">fp</span><span class="p">.</span><span class="n">sigsize</span> <span class="o">+</span> <span class="n">fp</span><span class="p">.</span><span class="n">poffset</span><span class="p">);</span>
+					<span class="n">c</span> <span class="o">|=</span> <span class="mh">0xE0</span><span class="p">;</span>
+					<span class="o">*</span><span class="p">(</span><span class="n">buf</span> <span class="o">+</span> <span class="n">i</span> <span class="o">+</span> <span class="n">fp</span><span class="p">.</span><span class="n">sigsize</span> <span class="o">+</span> <span class="n">fp</span><span class="p">.</span><span class="n">poffset</span><span class="p">)</span> <span class="o">=</span> <span class="n">c</span><span class="p">;</span>
+					<span class="k">return</span> <span class="n">i</span><span class="p">;</span>
+				<span class="nl">default:</span>
+					<span class="n">exit</span><span class="p">(</span><span class="mi">11</span><span class="p">);</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+	<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>	<span class="cm">/* signature not found */</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Yung data structure na defpatch is declared as shown below.</p>
+
+<p><img src="/assets/images/balong/defpatch.png" alt="defpatch data structure" /></p>
+
+<p>Yung signatures naman for the different chipsets is shown below as a screenshot.</p>
+
+<p><img src="/assets/images/balong/signatures.png" alt="Signatures for different chipsets" /></p>
+
+<p>Now the  next question here is kailan ba kino-call ang <em>patch()</em> function. If we
+go back to the <em>balong-usbdload.c</em> source and use the image below as a
+reference, the <em>patch()</em> function is being called by default as evident sa line
+493.</p>
+
+<p><img src="/assets/images/balong/bflag_cflag.png" alt="Screenshot for the bflag and cflag" /></p>
+
+<p>Using the same image above, and looking at the lines 494 - 504, hindi naman sya
+direct call sa <em>patch()</em> function, instead a function <em>(pv7r1() for example)</em> is
+being called instead. Kung pupuntahan natin ang source definition nang function
+na yun makikita natin na sya ang direct caller ng <em>patch()</em> function as shown in
+the image below. The next question is paano nya nalalaman kung anong signature
+ang gagamitin nya. Again looking at the lines 494 - 504, iniisa-isa nya ang
+pag-call for each signature.</p>
+
+<p><img src="/assets/images/balong/patch_caller.png" alt="Screenshot for the patch() caller" /></p>
+
+<p>Now na alam na natin ang procedure, let’s add that implementation sa
+<em>prepare_loader()</em> function natin.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">prepare_loader</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">loader</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+	<span class="kt">int</span> <span class="n">cflag</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+	<span class="cm">/* advance the file pointer 36-bytes from the beginning of the file */</span>
+	<span class="n">fseek</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="mi">36</span><span class="p">,</span> <span class="n">SEEK_SET</span><span class="p">);</span>
+	<span class="n">fread</span><span class="p">(</span><span class="o">&amp;</span><span class="n">blk</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span>	<span class="cm">/* read the first 16-bytes */</span>
+	<span class="n">fread</span><span class="p">(</span><span class="o">&amp;</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span> 	<span class="cm">/* read the next 16-bytes */</span>
+
+	<span class="k">for</span><span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+		<span class="n">blk</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">pbuf</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">);</span> 	<span class="cm">/* allocates memory */</span>
+
+		<span class="cm">/* advance the file pointer blk[i].offset bytes from the beginning of
+		 * the file */</span>
+		<span class="n">fseek</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">offset</span><span class="p">,</span> <span class="n">SEEK_SET</span><span class="p">);</span>
+
+		<span class="cm">/* copy the data to the memory location defined in blk[i].pbuf member */</span>
+		<span class="n">fread</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span>
+	<span class="p">}</span>
+
+	<span class="cm">/* default behaviour */</span>
+	<span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">cflag</span><span class="p">){</span>
+		<span class="cm">/* try the signature for v7r1 chipset */</span>
+		<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r1</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="cm">/* Try the other, if fail */</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r2</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r11</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22_2</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22_3</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Patch applied on offset 0x%08x.</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">offset</span> <span class="o">+</span> <span class="n">res</span><span class="p">);</span>
+		<span class="k">else</span><span class="p">{</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Patch signature not found. Use -c to boot without patching.</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+			<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+	<span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>If you look at line 97 using the image below, there is another function that
+calls the <em>patch()</em> function, that is <em>perasebad()</em> function. Yung <em>perasebad()</em>
+function is called if the <code class="language-plaintext highlighter-rouge">bflag</code> is set or the <code class="language-plaintext highlighter-rouge">-b</code> argument is included sa
+pag-run nang <strong>balong-usbdload</strong>. Kung itatranslate natin sa English yung line
+484 using <a href="https://translate.google.com">Google translate</a>, magiging malinaw
+kung para saan ang procedure if <code class="language-plaintext highlighter-rouge">bflag</code> is set. As shown in the image below, it
+is a patch erase procedure.</p>
+
+<p><img src="/assets/images/balong/bflag_translate.png" alt="screenshot for the bflag translation" /></p>
+
+<p>So update natin yung <em>prepare_loader()</em> function natin and add natin yung
+procedure if <code class="language-plaintext highlighter-rouge">bflag</code> is set.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">prepare_loader</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">loader</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+	<span class="kt">int</span> <span class="n">cflag</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>  <span class="n">bflag</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+	<span class="cm">/* advance the file pointer 36-bytes from the beginning of the file */</span>
+	<span class="n">fseek</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="mi">36</span><span class="p">,</span> <span class="n">SEEK_SET</span><span class="p">);</span>
+	<span class="n">fread</span><span class="p">(</span><span class="o">&amp;</span><span class="n">blk</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span>	<span class="cm">/* read the first 16-bytes */</span>
+	<span class="n">fread</span><span class="p">(</span><span class="o">&amp;</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span> 	<span class="cm">/* read the next 16-bytes */</span>
+
+	<span class="k">for</span><span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+		<span class="n">blk</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">pbuf</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">);</span> 	<span class="cm">/* allocates memory */</span>
+
+		<span class="cm">/* advance the file pointer blk[i].offset bytes from the beginning of
+		 * the file */</span>
+		<span class="n">fseek</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">offset</span><span class="p">,</span> <span class="n">SEEK_SET</span><span class="p">);</span>
+
+		<span class="cm">/* copy the data to the memory location defined in blk[i].pbuf member */</span>
+		<span class="n">fread</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span>
+	<span class="p">}</span>
+	<span class="k">if</span><span class="p">(</span><span class="n">bflag</span><span class="p">){</span>
+		<span class="n">res</span> <span class="o">=</span> <span class="n">perasebad</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">){</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Bad block signature not found. Loading not possible.</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+			<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="cm">/* default behaviour */</span>
+	<span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">cflag</span><span class="p">){</span>
+		<span class="cm">/* try the signature for v7r1 chipset */</span>
+		<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r1</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="cm">/* Try the other, if fail */</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r2</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r11</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22_2</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22_3</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Patch applied on offset 0x%08x.</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">offset</span> <span class="o">+</span> <span class="n">res</span><span class="p">);</span>
+		<span class="k">else</span><span class="p">{</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Patch signature not found. Use -c to boot without patching.</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+			<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+	<span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Bukod sa <em>patch()</em> function na dinescribe natin above, meron pang isang patching
+procedure na hindi iniemploy yung <em>patch()</em> function. Yun yung fastboot patch.
+This procedure is done if the <code class="language-plaintext highlighter-rouge">fbflag</code> is set. So ang ginagawa nya is 1-byte
+patch lang sa <em>usbloader.bin</em> file, and then it will put the device in
+<strong>fastboot mode</strong>. Lets analyze the source kung papaano nya pinapatch ang
+<em>usbloader.bin</em> file using the image below as a reference.</p>
+
+<p><img src="/assets/images/balong/fbflag.png" alt="screenshot for the fbflag" /></p>
+
+<p>At line 428, kino-call nya ang <em>locate_kernel()</em> function. Ang ginagawa lang
+nang <em>locate_kernel()</em> function is to find the offset or memory location nang
+start nang string <strong>ANDROID!</strong>. Then nagpeperform sya nang 1-byte signature
+patch by replacing the character <strong>A</strong> with the hex value <code class="language-plaintext highlighter-rouge">0x55</code>. It also
+changes the size of the <em>usbloader.bin</em> file to <code class="language-plaintext highlighter-rouge">offset + 8</code>. Yung definition
+nang <em>locate_kernel()</em> function is show in the image below.</p>
+
+<p><img src="/assets/images/balong/locate_kernel.png" alt="Screenshot of the locate kernel function" /></p>
+
+<p>Now, let’s update our <em>prepare_loader()</em> function to include yung procedure if
+<code class="language-plaintext highlighter-rouge">fbflag</code> is set.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">locate_kernel</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">buf</span><span class="p">,</span> <span class="kt">uint32_t</span> <span class="n">size</span><span class="p">);</span>
+
+<span class="kt">int</span> <span class="nf">prepare_loader</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">loader</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+	<span class="kt">int</span> <span class="n">cflag</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>  <span class="n">bflag</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="kt">int</span> <span class="n">fbflag</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+	<span class="kt">int</span> <span class="n">koffset</span><span class="p">;</span>
+
+	<span class="cm">/* advance the file pointer 36-bytes from the beginning of the file */</span>
+	<span class="n">fseek</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="mi">36</span><span class="p">,</span> <span class="n">SEEK_SET</span><span class="p">);</span>
+	<span class="n">fread</span><span class="p">(</span><span class="o">&amp;</span><span class="n">blk</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span>	<span class="cm">/* read the first 16-bytes */</span>
+	<span class="n">fread</span><span class="p">(</span><span class="o">&amp;</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span> 	<span class="cm">/* read the next 16-bytes */</span>
+
+	<span class="k">for</span><span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+		<span class="n">blk</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">pbuf</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">);</span> 	<span class="cm">/* allocates memory */</span>
+
+		<span class="cm">/* advance the file pointer blk[i].offset bytes from the beginning of
+		 * the file */</span>
+		<span class="n">fseek</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">offset</span><span class="p">,</span> <span class="n">SEEK_SET</span><span class="p">);</span>
+
+		<span class="cm">/* copy the data to the memory location defined in blk[i].pbuf member */</span>
+		<span class="n">fread</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">,</span> <span class="n">loader</span><span class="p">);</span>
+	<span class="p">}</span>
+
+	<span class="cm">/* Fastboot patch */</span>
+	<span class="k">if</span><span class="p">(</span><span class="n">fbflag</span><span class="p">){</span>
+		<span class="n">koffset</span> <span class="o">=</span> <span class="n">locate_kernel</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">koffset</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">){</span>
+			<span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">[</span><span class="n">koffset</span><span class="p">]</span> <span class="o">=</span> <span class="mh">0xAA</span><span class="p">;</span>	<span class="cm">/* signature patch */</span>
+			<span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span> <span class="o">=</span> <span class="n">koffset</span> <span class="o">+</span> <span class="mi">8</span><span class="p">;</span>		<span class="cm">/* trim the size of the loader */</span>
+		<span class="p">}</span> <span class="k">else</span><span class="p">{</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"The bootloader does not have an ANDROID component, "</span><span class="p">);</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Fastboot loading is not possible.</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+			<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="cm">/* Note that if bflag is set, fbflag is also set */</span>
+	<span class="k">if</span><span class="p">(</span><span class="n">bflag</span><span class="p">){</span>
+		<span class="n">res</span> <span class="o">=</span> <span class="n">perasebad</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">){</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Bad block signature not found. Loading not possible.</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+			<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="cm">/* default behaviour */</span>
+	<span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">cflag</span><span class="p">){</span>
+		<span class="cm">/* try the signature for v7r1 chipset */</span>
+		<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r1</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="cm">/* Try the other, if fail */</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r2</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r11</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22_2</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">pv7r22_3</span><span class="p">(</span><span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pbuf</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">size</span><span class="p">);</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">res</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Patch applied on offset 0x%08x.</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">blk</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">offset</span> <span class="o">+</span> <span class="n">res</span><span class="p">);</span>
+		<span class="k">else</span><span class="p">{</span>
+			<span class="n">printf</span><span class="p">(</span><span class="s">"Patch signature not found. Use -c to boot without patching.</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+			<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+	<span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">locate_kernel</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">buf</span><span class="p">,</span> <span class="kt">uint32_t</span> <span class="n">size</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">int</span> <span class="n">koff</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+	<span class="cm">/* start looking from the end of the file */</span>
+	<span class="k">for</span><span class="p">(</span><span class="n">koff</span> <span class="o">=</span> <span class="p">(</span><span class="n">size</span> <span class="o">-</span> <span class="mi">8</span><span class="p">);</span> <span class="n">koff</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">;</span> <span class="n">koff</span><span class="o">--</span><span class="p">){</span>
+		<span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">buf</span> <span class="o">+</span> <span class="n">koff</span><span class="p">,</span> <span class="s">"ANDROID!"</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+			<span class="k">return</span> <span class="n">koff</span><span class="p">;</span>
+	<span class="p">}</span>
+	<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>There are other options na available sa original source nya, yung <code class="language-plaintext highlighter-rouge">-m</code> and <code class="language-plaintext highlighter-rouge">-t</code>
+options. Yung <code class="language-plaintext highlighter-rouge">-m</code> option is used to print the partition table na included doon
+sa <em>usbloader.bin</em> file, specifically doon sa <em>bootloader block</em>. Yung <code class="language-plaintext highlighter-rouge">-t</code>
+option naman is used to replace the partition table na nasa <em>usbloader.bin</em> file
+with an external partition table file. Hindi na natin sya iinclude sa analysis
+since wala nanam silang direct effect sa loading nang <em>usbloader.bin</em> file. And
+also, most of the time hindi naman sya ginagamit sa pag-flash nang device.</p>
+
+<p>If you notice, hindi na natin isinama sa analysis yung part nang source na
+specific sa <strong>Windows</strong> like doon sa image below.</p>
+
+<p><img src="/assets/images/balong/windows_part.png" alt="Screenshot of the partial source of the windows part of the
+source" /></p>
+
+<p>Originally kase dinivelop ni <em>forth32</em> yung software for <strong>linux</strong> then
+eventually nagdagdag is <em>rust3028</em>
+nang code for the <strong>Windows</strong> port. Ginagamit ko kasi is <strong>FreeBSD</strong> and
+<strong>Linux</strong>, and yung implementation is <strong>FreeBSD</strong>. But the source compiles both
+on <strong>FreeBSD</strong> and <strong>Linux</strong>. Yung logic sa preparation, loading, and yung
+patching is the same lang din naman sa <strong>Windows</strong>, nagkakaiba lang naman kung
+paano ang port handling sa <strong>Windows</strong>. Since port handling lang naman sila
+nagkakaiba, yung modification na gagawin para sa <strong>Windows</strong> port eh dun lang sa
+<em>open_port()</em> function. This is the reason kaya natin dinivide sa tatlo yung
+implementation natin, para yung code modification will be done separately. Yun
+nga palang full implementation or source code can be seen or downloaded from
+<a href="https://github.com/zer0325/balong-malalim">this</a> repository. Although yung
+source is still a <em>WIP</em> it accomplishes the thing that it is supposed to do.
+<del>Yung mga <em>printf</em> statements sa main function are for debugging purposes which
+will be modified later on</del>.</p>
+
+<p>Hanggang dito na lang po, I hope nakapagbigay kahit papaano nang kaunting kaalaman
+etong munti kong ambag. Maraming Salamat po.</p>
+
+<h1 id="references">REFERENCES</h1>
+
+<p><a href="https://github.com/forth32/balong-usbdload">https://github.com/forth32/balong-usbdload</a>
+<a href="https://www.cmrr.umn.edu/~strupp/serial.html">Serial Programming for POSIX Systems</a></p>
+
+</article>
+      </section>
+    </div>
+  </div>
+
+   <footer>
+  <a href="https://creativecommons.org/licenses/by-nc/3.0/deed.en_US">
+    <span>
+        <b>zer0325</b>
+    </span>
+    
+    <span>© 2021</span>
+  </a>
+</footer>
+
+  
+</body>
+
+</html>
